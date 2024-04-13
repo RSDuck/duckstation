@@ -109,8 +109,6 @@ void ReleaseGPUDevice();
 /// Called before drawing the OSD and other display elements.
 void BeginPresentFrame();
 
-void RequestExit(bool allow_confirm);
-
 namespace Internal {
 /// Retrieves the base settings layer. Must call with lock held.
 SettingsInterface* GetBaseSettingsLayer();

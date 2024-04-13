@@ -479,10 +479,12 @@ void Host::CommitBaseSettingChanges()
 
 void Host::RequestExitApplication(bool allow_confirm)
 {
+  NoGUIHost::StopRunning();
 }
 
 void Host::RequestExitBigPicture()
 {
+  NoGUIHost::StopRunning();
 }
 
 void NoGUIHost::SaveSettings()
@@ -1018,7 +1020,7 @@ std::optional<WindowInfo> Host::GetTopLevelWindowInfo()
   return g_nogui_window->GetPlatformWindowInfo();
 }
 
-void Host::RequestExit(bool allow_confirm)
+void NoGUIHost::StopRunning()
 {
   if (System::IsValid())
   {
@@ -1064,7 +1066,7 @@ static void SignalHandler(int signal)
   {
     std::fprintf(stderr, "Received CTRL+C, attempting graceful shutdown. Press CTRL+C again to force.\n");
     graceful_shutdown_attempted = true;
-    Host::RequestExit(false);
+    NoGUIHost::StopRunning();
     return;
   }
 

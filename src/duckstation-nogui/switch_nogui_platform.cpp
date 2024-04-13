@@ -171,7 +171,7 @@ void SwitchNoGUIPlatform::RunMessageLoop()
   while (m_message_loop_running.load(std::memory_order_acquire))
   {
     if (!appletMainLoop())
-      Host::RunOnCPUThread([]() { Host::RequestExit(false); });
+      NoGUIHost::StopRunning();
 
     std::unique_lock lock(m_callback_queue_mutex);
     while (!m_callback_queue.empty())

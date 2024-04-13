@@ -21,6 +21,8 @@ std::string GetAppConfigSuffix();
 /// Thread-safe settings access.
 void SaveSettings();
 
+void StopRunning();
+
 /// Called on the UI thread in response to various events.
 void ProcessPlatformWindowResize(s32 width, s32 height, float scale);
 void ProcessPlatformMouseMoveEvent(float x, float y);
