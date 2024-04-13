@@ -2,6 +2,8 @@
 #include "common/string_util.h"
 #include "core/host.h"
 
+#include "common/bitutils.h"
+
 static const char* s_switch_button_names[] = {
   "A",     "B",     "X",        "Y",      "LStick",    "RStick",   "L",       "R",       "ZL",    "ZR",
   "Plus",  "Minus", "DPadLeft", "DPadUp", "DPadRight", "DPadDown", nullptr,   nullptr,   nullptr, nullptr,
@@ -109,7 +111,7 @@ void SwitchInputSource::UpdateState(u32 controller)
   m_controllers[controller].buttons = buttons;
   while (buttons_diff)
   {
-    int button = __builtin_ctzll(buttons_diff);
+    u32 button = CountTrailingZeros(buttons_diff);
     buttons_diff &= ~(1ull << button);
     float value = buttons & (1ull << button) ? 1.f : 0.f;
     InputManager::InvokeEvents(MakeGenericControllerButtonKey(InputSourceType::Switch, controller, button), value,
@@ -235,7 +237,7 @@ std::optional<InputBindingKey> SwitchInputSource::ParseKeyString(const std::stri
       if (binding.substr(1) == s_switch_axis_names[i])
       {
         key.source_subtype = InputSubclass::ControllerAxis;
-        key.invert = binding[0] == '-';
+        key.modifier = binding[0] == '-' ? InputModifier::Negate : InputModifier::None;
         key.data = i;
         return key;
       }
