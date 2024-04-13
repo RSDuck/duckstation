@@ -281,6 +281,9 @@ elseif(NINTENDO_SWITCH)
     platform_misc_switch.cpp
     switch_input_source.cpp
 
+    switch_audio_stream.cpp
+    switch_audio_stream.h
+
     deko3d_device.cpp
     deko3d_stream_buffer.cpp
     deko3d_texture.cpp

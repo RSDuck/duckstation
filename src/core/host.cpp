@@ -402,6 +402,11 @@ std::unique_ptr<AudioStream> Host::CreateAudioStream(AudioBackend backend, u32 s
       return AudioStream::CreateXAudio2Stream(sample_rate, channels, buffer_ms, latency_ms, stretch);
 #endif
 
+#ifdef __SWITCH__
+    case AudioBackend::Switch:
+      return AudioStream::CreateSwitchAudioStream(sample_rate, channels, buffer_ms, latency_ms, stretch);
+#endif
+
     case AudioBackend::Null:
       return AudioStream::CreateNullStream(sample_rate, channels, buffer_ms);
 

@@ -1,7 +1,6 @@
 #include "switch_audio_stream.h"
 #include "common/assert.h"
 #include "common/log.h"
-#include "common_host.h"
 #include <switch.h>
 Log_SetChannel(SwitchAudioStream);
 
@@ -154,8 +153,8 @@ void SwitchAudioStream::AudioThread(void* userdata)
   }
 }
 
-std::unique_ptr<AudioStream> CommonHost::CreateSwitchAudioStream(u32 sample_rate, u32 channels, u32 buffer_ms,
-                                                                u32 latency_ms, AudioStretchMode stretch)
+std::unique_ptr<AudioStream> AudioStream::CreateSwitchAudioStream(u32 sample_rate, u32 channels, u32 buffer_ms, u32 latency_ms,
+                                                     AudioStretchMode stretch)
 {
   std::unique_ptr<SwitchAudioStream> stream(
     std::make_unique<SwitchAudioStream>(sample_rate, channels, buffer_ms, stretch));

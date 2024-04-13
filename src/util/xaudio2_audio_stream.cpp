@@ -12,6 +12,7 @@
 #include <memory>
 #include <wrl/client.h>
 #include <xaudio2.h>
+#include "audio_stream.h"
 
 Log_SetChannel(XAudio2AudioStream);
 

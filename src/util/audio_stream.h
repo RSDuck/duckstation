@@ -93,6 +93,10 @@ public:
   static std::unique_ptr<AudioStream> CreateXAudio2Stream(u32 sample_rate, u32 channels, u32 buffer_ms, u32 latency_ms,
                                                           AudioStretchMode stretch);
 #endif
+#ifdef __SWITCH__
+  static std::unique_ptr<AudioStream> CreateSwitchAudioStream(u32 sample_rate, u32 channels, u32 buffer_ms,
+                                                              u32 latency_ms, AudioStretchMode stretch);
+#endif
 
 protected:
   AudioStream(u32 sample_rate, u32 channels, u32 buffer_ms, AudioStretchMode stretch);
