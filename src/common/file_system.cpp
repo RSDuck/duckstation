@@ -852,28 +852,6 @@ std::vector<std::string> FileSystem::GetRootDirectoryList()
       ptr += len + 1u;
     }
   }
-#elif defined(_UWP)
-  if (const auto install_location = winrt::Windows::ApplicationModel::Package::Current().InstalledLocation();
-      install_location)
-  {
-    if (const auto path = install_location.Path(); !path.empty())
-      results.push_back(StringUtil::WideStringToUTF8String(path));
-  }
-
-  if (const auto local_location = winrt::Windows::Storage::ApplicationData::Current().LocalFolder(); local_location)
-  {
-    if (const auto path = local_location.Path(); !path.empty())
-      results.push_back(StringUtil::WideStringToUTF8String(path));
-  }
-
-  const auto devices = winrt::Windows::Storage::KnownFolders::RemovableDevices();
-  const auto folders_task(devices.GetFoldersAsync());
-  for (const auto& storage_folder : folders_task.get())
-  {
-    const auto path = storage_folder.Path();
-    if (!path.empty())
-      results.push_back(StringUtil::WideStringToUTF8String(path));
-  }
 #elif defined(__SWITCH__)
   results.push_back("sdmc:");
 #else
@@ -2153,14 +2131,6 @@ bool FileSystem::FileExists(const char* path)
   if (path[0] == '\0')
     return false;
 
-#ifdef __ANDROID__
-  if (IsUriPath(Path) && UriHelpersAreAvailable())
-  {
-    FILESYSTEM_STAT_DATA sd;
-    return (StatUriFile(Path, &sd) && (sd.Attributes & FILESYSTEM_FILE_ATTRIBUTE_DIRECTORY) == 0);
-  }
-#endif
-
   // stat file
 #if defined(__HAIKU__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__SWITCH__)
   struct stat sysStatData;
@@ -2182,14 +2152,6 @@ bool FileSystem::DirectoryExists(const char* path)
   // has a path
   if (path[0] == '\0')
     return false;
-
-#ifdef __ANDROID__
-  if (IsUriPath(Path) && UriHelpersAreAvailable())
-  {
-    FILESYSTEM_STAT_DATA sd;
-    return (StatUriFile(Path, &sd) && (sd.Attributes & FILESYSTEM_FILE_ATTRIBUTE_DIRECTORY) != 0);
-  }
-#endif
 
   // stat file
 #if defined(__HAIKU__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__SWITCH__)
@@ -2238,7 +2200,6 @@ bool FileSystem::CreateDirectory(const char* path, bool recursive, Error* error)
   if (pathLength == 0)
     return false;
 
-  printf("mkdiring path %s\n", path);
   // try just flat-out, might work if there's no other segments that have to be made
   if (mkdir(path, 0777) == 0)
     return true;
