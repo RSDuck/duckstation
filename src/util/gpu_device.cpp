@@ -789,7 +789,6 @@ bool GPUDevice::UpdateImGuiFontTexture()
     return true;
   }
 
-  printf("updating font texture...\n");
   std::unique_ptr<GPUTexture> new_font =
     FetchTexture(width, height, 1, 1, 1, GPUTexture::Type::Texture, GPUTexture::Format::RGBA8, pixels, pitch);
   if (!new_font)

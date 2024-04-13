@@ -158,8 +158,8 @@ std::unique_ptr<GPUPipeline> Deko3DDevice::CreatePipeline(const GPUPipeline::Gra
 
 void Deko3DDevice::ApplyRasterizationState(GPUPipeline::RasterizationState rs)
 {
-  //if (m_last_rasterization_state == rs)
-  //  return;
+  if (m_last_rasterization_state == rs)
+    return;
 
   static constexpr std::array<DkFace, static_cast<u32>(GPUPipeline::CullMode::MaxCount)> map_cull_face{
     {DkFace_None, DkFace_Front, DkFace_Back}};
@@ -173,8 +173,8 @@ void Deko3DDevice::ApplyRasterizationState(GPUPipeline::RasterizationState rs)
 
 void Deko3DDevice::ApplyDepthState(GPUPipeline::DepthState ds)
 {
-  //if (m_last_depth_state == ds)
-  //  return;
+  if (m_last_depth_state == ds)
+    return;
 
   // is deko3D like OpenGL in that disabling depth testing also disables depth writing?
   // probably considering the GPU is an OpenGL hardware implementation in a lot of ways
@@ -189,8 +189,8 @@ void Deko3DDevice::ApplyDepthState(GPUPipeline::DepthState ds)
   d3d_state.setDepthTestEnable(ds.depth_test != GPUPipeline::DepthFunc::Always || ds.depth_write);
   if (d3d_state.depthTestEnable)
   {
-    d3d_state.setDepthCompareOp(map_func[static_cast<u32>(ds.depth_test.GetValue())]);
-    d3d_state.setDepthWriteEnable(ds.depth_write);
+    d3d_state.setDepthCompareOp(map_func[static_cast<u32>(ds.depth_test.GetValue())])
+      .setDepthWriteEnable(ds.depth_write);
   }
 
   dk::CmdBuf cmdbuf = GetCurrentCommandBuffer();
@@ -209,7 +209,7 @@ void Deko3DDevice::ApplyBlendState(GPUPipeline::BlendState bs)
     DkBlendFactor_SrcAlpha,      // SrcAlpha
     DkBlendFactor_InvSrcAlpha,   // InvSrcAlpha
     DkBlendFactor_Src1Alpha,     // SrcAlpha1
-    DkBlendFactor_Src1Alpha,     // InvSrcAlpha1
+    DkBlendFactor_InvSrc1Alpha,  // InvSrcAlpha1
     DkBlendFactor_DstAlpha,      // DstAlpha
     DkBlendFactor_InvDstAlpha,   // InvDstAlpha
     DkBlendFactor_ConstColor,    // ConstantColor
@@ -224,56 +224,48 @@ void Deko3DDevice::ApplyBlendState(GPUPipeline::BlendState bs)
     DkBlendOp_Max,    // Max
   }};
 
-  //if (bs == m_last_blend_state)
-  //  return;
+  if (bs == m_last_blend_state)
+    return;
 
   dk::CmdBuf cmdbuf = GetCurrentCommandBuffer();
 
-  //if (bs.enable != m_last_blend_state.enable)
+  if (bs.enable != m_last_blend_state.enable)
   {
     dk::ColorState dk_colorstate;
     dk_colorstate.setBlendEnable(0, bs.enable);
     cmdbuf.bindColorState(dk_colorstate);
   }
 
-  //if (bs.enable)
+  if (bs.enable)
   {
     if (bs.blend_factors != m_last_blend_state.blend_factors || bs.blend_ops != m_last_blend_state.blend_ops)
     {
       dk::BlendState dk_blendstate;
-      dk_blendstate.setFactors(blend_mapping[static_cast<u8>(bs.src_blend.GetValue())],
-                               blend_mapping[static_cast<u8>(bs.dst_blend.GetValue())],
-                               blend_mapping[static_cast<u8>(bs.src_alpha_blend.GetValue())],
-                               blend_mapping[static_cast<u8>(bs.dst_alpha_blend.GetValue())]);
-      dk_blendstate.setOps(op_mapping[static_cast<u8>(bs.blend_op.GetValue())],
-                           op_mapping[static_cast<u8>(bs.alpha_blend_op.GetValue())]);
+      dk_blendstate
+        .setFactors(blend_mapping[static_cast<u8>(bs.src_blend.GetValue())],
+                    blend_mapping[static_cast<u8>(bs.dst_blend.GetValue())],
+                    blend_mapping[static_cast<u8>(bs.src_alpha_blend.GetValue())],
+                    blend_mapping[static_cast<u8>(bs.dst_alpha_blend.GetValue())])
+        .setOps(op_mapping[static_cast<u8>(bs.blend_op.GetValue())],
+                op_mapping[static_cast<u8>(bs.alpha_blend_op.GetValue())]);
       cmdbuf.bindBlendStates(0, {dk_blendstate});
     }
 
     if (bs.constant != m_last_blend_state.constant)
       cmdbuf.setBlendConst(bs.GetConstantRed(), bs.GetConstantGreen(), bs.GetConstantBlue(), bs.GetConstantAlpha());
   }
-  /*else
+  else
   {
     // Keep old values for blend options to potentially avoid calls when re-enabling.
     bs.blend_factors.SetValue(m_last_blend_state.blend_factors);
     bs.blend_ops.SetValue(m_last_blend_state.blend_ops);
     bs.constant.SetValue(m_last_blend_state.constant);
-  }*/
+  }
 
-  //if (bs.write_mask != m_last_blend_state.write_mask)
+  if (bs.write_mask != m_last_blend_state.write_mask)
   {
     dk::ColorWriteState dk_colorwritestate;
-    uint32_t mask = 0;
-    if (bs.write_r)
-      mask |= DkColorMask_R;
-    if (bs.write_g)
-      mask |= DkColorMask_G;
-    if (bs.write_b)
-      mask |= DkColorMask_B;
-    if (bs.write_a)
-      mask |= DkColorMask_A;
-    dk_colorwritestate.setMask(0, mask);
+    dk_colorwritestate.setMask(0, bs.write_mask.GetValue());
     cmdbuf.bindColorWriteState(dk_colorwritestate);
   }
 
@@ -282,8 +274,8 @@ void Deko3DDevice::ApplyBlendState(GPUPipeline::BlendState bs)
 
 void Deko3DDevice::SetPipeline(GPUPipeline* pipeline)
 {
-  //if (pipeline == m_current_pipeline)
-  //  return;
+  if (pipeline == m_current_pipeline)
+    return;
 
   Deko3DPipeline* const P = static_cast<Deko3DPipeline*>(pipeline);
 

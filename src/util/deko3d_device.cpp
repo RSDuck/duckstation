@@ -168,7 +168,7 @@ bool Deko3DDevice::CreateDevice(const std::string_view& adapter, bool threaded_p
   m_features.per_sample_shading = true;
   m_features.noperspective_interpolation = true;
   m_features.texture_copy_to_self = true;
-  m_features.supports_texture_buffers = false;
+  m_features.supports_texture_buffers = true;
   m_features.geometry_shaders = true;
   m_features.partial_msaa_resolve = true;
   m_features.shader_cache = true;
@@ -631,7 +631,8 @@ void Deko3DDevice::SetTextureSampler(u32 slot, GPUTexture* texture, GPUSampler* 
     m_current_samplers[slot] = S;
   }
 
-  CommitClear(GetCurrentCommandBuffer(), T);
+  if (texture)
+    CommitClear(GetCurrentCommandBuffer(), T);
 
   m_textures_dirty |= 1 << slot;
 }
@@ -658,8 +659,8 @@ void Deko3DDevice::CreateNullTexture()
 void Deko3DDevice::SetViewport(s32 x, s32 y, s32 width, s32 height)
 {
   const Common::Rectangle<s32> rc = Common::Rectangle<s32>::FromExtents(x, y, width, height);
-  // if (m_last_viewport == rc)
-  //    return;
+  if (m_last_viewport == rc)
+    return;
 
   m_last_viewport = rc;
 
@@ -669,8 +670,8 @@ void Deko3DDevice::SetViewport(s32 x, s32 y, s32 width, s32 height)
 void Deko3DDevice::SetScissor(s32 x, s32 y, s32 width, s32 height)
 {
   const Common::Rectangle<s32> rc = Common::Rectangle<s32>::FromExtents(x, y, width, height);
-  // if (m_last_scissor == rc)
-  //    return;
+  if (m_last_scissor == rc)
+    return;
 
   m_last_scissor = rc;
   UpdateScissor();
@@ -786,7 +787,7 @@ void Deko3DDevice::PrepareTextures()
           m_barrier_counter++;
         }
 
-        // if (texture->GetDescriptorFence() != GetCurrentFenceCounter())
+        if (texture->GetDescriptorFence() != GetCurrentFenceCounter())
         {
           u32 descriptor_idx = frame_resources.next_image_descriptor++;
           AssertMsg(descriptor_idx < MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTORS_PER_FRAME, "Ran out of image descriptors");
@@ -796,7 +797,7 @@ void Deko3DDevice::PrepareTextures()
         }
 
         Deko3DSampler* sampler = m_current_samplers[i];
-        // if (sampler->GetDescriptorFence() != GetCurrentFenceCounter())
+        if (sampler->GetDescriptorFence() != GetCurrentFenceCounter())
         {
           u32 descriptor_idx = frame_resources.next_sampler_descriptor++;
           AssertMsg(descriptor_idx < MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTORS_PER_FRAME,
@@ -854,7 +855,6 @@ bool Deko3DDevice::BeginPresent(bool skip_present)
 
 void Deko3DDevice::EndPresent(bool explicit_submit)
 {
-  dk::CmdBuf cmdbuf = GetCurrentCommandBuffer();
   SubmitCommandBuffer(m_swap_chain.get());
   MoveToNextCommandBuffer();
   TrimTexturePool();
