@@ -309,7 +309,7 @@ u32 CPU::CodeCache::EmitJump(void* code, const void* dst, ptrdiff_t rw_diff, boo
   DebugAssert(vixl::IsInt26(disp));
 
   const u32 new_code = B | Assembler::ImmUncondBranch(disp);
-  std::memcpy(code + rw_diff, &new_code, sizeof(new_code));
+  std::memcpy(reinterpret_cast<u8*>(code) + rw_diff, &new_code, sizeof(new_code));
   if (flush_icache)
     JitCodeBuffer::FlushInstructionCache(code, kInstructionSize);
 
