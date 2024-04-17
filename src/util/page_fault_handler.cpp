@@ -31,7 +31,7 @@ Log_SetChannel(Common::PageFaultHandler);
 #include <mach/mach_port.h>
 #include <mach/task.h>
 #elif defined(__SWITCH__)
-#include <switch.h>
+#include "switch_exception_frame.h"
 #endif
 
 namespace Common::PageFaultHandler {
@@ -239,7 +239,7 @@ static void SignalHandler(int sig, siginfo_t* info, void* ctx)
 
 #elif defined(__SWITCH__)
 
-bool PageFaultHandler(ThreadExceptionDump* ctx)
+bool PageFaultHandler(ExceptionFrameA64* frame)
 {
   // Executing the handler concurrently from multiple threads wouldn't go down well.
   std::unique_lock lock(s_exception_handler_mutex);
@@ -248,8 +248,8 @@ bool PageFaultHandler(ThreadExceptionDump* ctx)
   if (s_in_exception_handler)
     return false;
 
-  void* const exception_pc = reinterpret_cast<void*>(ctx->pc.x);
-  void* const exception_address = reinterpret_cast<void*>(ctx->far.x);
+  void* const exception_pc = reinterpret_cast<void*>(frame->pc);
+  void* const exception_address = reinterpret_cast<void*>(frame->far);
   const bool is_write = IsStoreInstruction(exception_pc);
 
   s_in_exception_handler = true;

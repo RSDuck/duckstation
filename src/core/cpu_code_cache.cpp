@@ -754,9 +754,7 @@ Common::PageFaultHandler::HandlerResult CPU::CodeCache::ExceptionHandler(void* e
       static_cast<const u8*>(fault_address) < (Bus::g_ram + Bus::RAM_8MB_SIZE))
   {
     // Writing to protected RAM.
-    // On Switch we currently only set memory as either
-    // RW or not accessible at all, so unfortunately this has to be commented
-    // DebugAssert(is_write);
+    DebugAssert(is_write);
     const u32 guest_address = static_cast<u32>(static_cast<const u8*>(fault_address) - Bus::g_ram);
     const u32 page_index = Bus::GetRAMCodePageIndex(guest_address);
     Log_DevFmt("Page fault on protected RAM @ 0x{:08X} (page #{}), invalidating code cache.", guest_address,

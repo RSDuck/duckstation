@@ -1,25 +1,79 @@
-.global QuickContextRestore
-QuickContextRestore:
-    mov x18, x0
+.text
 
-    ldr x0, [x18, #248]
-    mov sp, x0
+.extern switch_exception_stack_top
+.extern switch_exception_handler
 
-    ldp x0, x1, [x18, #0]
-    ldp x2, x3, [x18, #16]
-    ldp x4, x5, [x18, #32]
-    ldp x6, x7, [x18, #48]
-    ldp x8, x9, [x18, #64]
-    ldp x10, x11, [x18, #80]
-    ldp x12, x13, [x18, #96]
-    ldp x14, x15, [x18, #112]
-    ldp x16, x17, [x18, #128]
-    ldp x19, x20, [x18, #152]
-    ldp x21, x22, [x18, #168]
-    ldp x23, x24, [x18, #184]
-    ldp x25, x26, [x18, #200]
-    ldp x27, x28, [x18, #216]
-    ldp x29, x30, [x18, #232]
+#define EXCEPTION_STACK_SIZE 0x8000
 
-    ldr x18, [x18, #256]
-    br x18
+.global __libnx_exception_entry
+__libnx_exception_entry:
+    adrp x2, switch_exception_stack_top
+    add x2, x2, #:lo12:switch_exception_stack_top
+    add sp, x2, EXCEPTION_STACK_SIZE
+
+    sub sp, sp, #16*37
+
+    // we only need to take care of the
+    // of caller saved registers which aren't
+    // in the exception frame
+    stp x9, x10, [sp]
+    stp x11, x12, [sp, #16*1]
+    stp x13, x14, [sp, #16*2]
+    stp x15, x16, [sp, #16*3]
+    stp x17, x18, [sp, #16*4]
+
+    // store all the vector registers
+    // Unfortunately only the double part (lower 8-byte) of
+    // v8-v15 is callee saved. So to keep the exact state we need
+    // to store all registers (storing just the upper part
+    // is more work than the whole 16 bytes)
+    stp q0, q1, [sp, #16*5]
+    stp q2, q3, [sp, #16*7]
+    stp q4, q5, [sp, #16*9]
+    stp q6, q7, [sp, #16*11]
+    stp q8, q9, [sp, #16*13]
+    stp q10, q11, [sp, #16*15]
+    stp q12, q13, [sp, #16*17]
+    stp q14, q15, [sp, #16*19]
+    stp q16, q17, [sp, #16*21]
+    stp q18, q19, [sp, #16*23]
+    stp q20, q21, [sp, #16*25]
+    stp q22, q23, [sp, #16*27]
+    stp q24, q25, [sp, #16*29]
+    stp q26, q27, [sp, #16*31]
+    stp q28, q29, [sp, #16*33]
+    stp q30, q31, [sp, #16*35]
+
+    // setup parameters (x0=exception reason, x1=exception frame, x2=fp)
+    mov x2, x29
+    bl switch_exception_handler
+
+    // load all vector registers
+    ldp q0, q1, [sp, #16*5]
+    ldp q2, q3, [sp, #16*7]
+    ldp q4, q5, [sp, #16*9]
+    ldp q6, q7, [sp, #16*11]
+    ldp q8, q9, [sp, #16*13]
+    ldp q10, q11, [sp, #16*15]
+    ldp q12, q13, [sp, #16*17]
+    ldp q14, q15, [sp, #16*19]
+    ldp q16, q17, [sp, #16*21]
+    ldp q18, q19, [sp, #16*23]
+    ldp q20, q21, [sp, #16*25]
+    ldp q22, q23, [sp, #16*27]
+    ldp q24, q25, [sp, #16*29]
+    ldp q26, q27, [sp, #16*31]
+    ldp q28, q29, [sp, #16*33]
+    ldp q30, q31, [sp, #16*35]
+
+    ldp x9, x10, [sp]
+    ldp x11, x12, [sp, #16*1]
+    ldp x13, x14, [sp, #16*2]
+    ldp x15, x16, [sp, #16*3]
+    ldp x17, x18, [sp, #16*4]
+
+    // hehe we don't need to restore the stack pointer
+
+    // let the kernel restore everything else
+    mov x0, 0
+    bl svcReturnFromException

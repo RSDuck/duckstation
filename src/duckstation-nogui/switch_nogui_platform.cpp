@@ -2,10 +2,12 @@
 
 #include "core/host.h"
 
+#include "util/switch_exception_frame.h"
+
 #include <switch.h>
 
 namespace Common::PageFaultHandler {
-bool PageFaultHandler(ThreadExceptionDump* ctx);
+bool PageFaultHandler(ExceptionFrameA64* ctx);
 }
 
 extern "C" {
@@ -13,22 +15,22 @@ extern "C" {
 extern char __start__;
 extern char __rodata_start;
 
-void HandleFault(uint64_t pc, uint64_t lr, uint64_t fp, uint64_t faultAddr, uint32_t desc)
+void HandleFault(uint64_t pc, uint64_t lr, uint64_t fp, uint64_t fault_addr, Result desc)
 {
   if (pc >= (uint64_t)&__start__ && pc < (uint64_t)&__rodata_start)
   {
     printf("Unintentional fault in .text at %p (type %d) (trying to access %p?)\n", (void*)(pc - (uint64_t)&__start__),
-           desc, (void*)faultAddr);
+           desc, (void*)fault_addr);
 
-    int frameNum = 0;
+    int frame_num = 0;
     while (true)
     {
-      printf("Stack frame %d %p\n", frameNum, (void*)(lr - (uint64_t)&__start__));
+      printf("Stack frame %d %p\n", frame_num, (void*)(lr - (uint64_t)&__start__));
       lr = *(uint64_t*)(fp + 8);
       fp = *(uint64_t*)fp;
 
-      frameNum++;
-      if (frameNum > 16 || fp == 0 || (fp & 0x7) != 0)
+      frame_num++;
+      if (frame_num > 16 || fp == 0 || (fp & 0x7) != 0)
         break;
     }
   }
@@ -38,19 +40,19 @@ void HandleFault(uint64_t pc, uint64_t lr, uint64_t fp, uint64_t faultAddr, uint
     if (lr >= (uint64_t)&__start__ && lr < (uint64_t)&__rodata_start)
       printf("LR in range: %p\n", (void*)(lr - (uint64_t)&__start__));
   }
+
+  svcBreak(BreakReason_Panic, 0, 0);
 }
 
-void QuickContextRestore(u64*) __attribute__((noreturn));
+static_assert(sizeof(ExceptionFrameA64) == 0x78);
 
-alignas(16) uint8_t __nx_exception_stack[0x8000];
-uint64_t __nx_exception_stack_size = 0x8000;
+alignas(16) uint8_t switch_exception_stack_top[0x8000];
 
-void __libnx_exception_handler(ThreadExceptionDump* ctx)
+void switch_exception_handler(Result reason, ExceptionFrameA64* frame, u64 fp)
 {
-  if (Common::PageFaultHandler::PageFaultHandler(ctx))
-    QuickContextRestore(&ctx->cpu_gprs[0].x);
-  else
-    HandleFault(ctx->pc.x, ctx->lr.x, ctx->fp.x, ctx->far.x, ctx->error_desc);
+  if (Common::PageFaultHandler::PageFaultHandler(frame))
+    return;
+  HandleFault(frame->pc, frame->lr, fp, frame->far, reason);
 }
 }
 
@@ -104,8 +106,8 @@ void SwitchNoGUIPlatform::ReportError(const std::string_view& title, const std::
   shortError += ": ";
   shortError += message.substr(0, message.find('\n'));
   // small hack to make the error messages nicer to look at.
-  if (shortError[shortError.size()-1] == ':')
-    shortError[shortError.size()-1] = '.';
+  if (shortError[shortError.size() - 1] == ':')
+    shortError[shortError.size() - 1] = '.';
   std::string longError(message);
 
   ErrorApplicationConfig errapp;
@@ -119,7 +121,9 @@ bool SwitchNoGUIPlatform::ConfirmMessage(const std::string_view& title, const st
   return true;
 }
 
-void SwitchNoGUIPlatform::SetDefaultConfig(SettingsInterface& si) {}
+void SwitchNoGUIPlatform::SetDefaultConfig(SettingsInterface& si)
+{
+}
 
 bool SwitchNoGUIPlatform::CreatePlatformWindow(std::string title)
 {
@@ -131,7 +135,9 @@ bool SwitchNoGUIPlatform::HasPlatformWindow() const
   return true;
 }
 
-void SwitchNoGUIPlatform::DestroyPlatformWindow() {}
+void SwitchNoGUIPlatform::DestroyPlatformWindow()
+{
+}
 
 std::optional<WindowInfo> SwitchNoGUIPlatform::GetPlatformWindowInfo()
 {
@@ -148,13 +154,16 @@ std::optional<WindowInfo> SwitchNoGUIPlatform::GetPlatformWindowInfo()
     wi.surface_height = 1080;
   }
   wi.surface_scale = 1.2f;
+  wi.surface_refresh_rate = 60.f;
   wi.surface_format = GPUTexture::Format::RGBA8;
   wi.type = WindowInfo::Type::Switch;
   wi.window_handle = nwindowGetDefault();
   return wi;
 }
 
-void SwitchNoGUIPlatform::SetPlatformWindowTitle(std::string title) {}
+void SwitchNoGUIPlatform::SetPlatformWindowTitle(std::string title)
+{
+}
 
 std::optional<u32> SwitchNoGUIPlatform::ConvertHostKeyboardStringToCode(const std::string_view& str)
 {
@@ -196,7 +205,9 @@ void SwitchNoGUIPlatform::QuitMessageLoop()
   m_message_loop_running.store(false, std::memory_order_release);
 }
 
-void SwitchNoGUIPlatform::SetFullscreen(bool enabled) {}
+void SwitchNoGUIPlatform::SetFullscreen(bool enabled)
+{
+}
 
 bool SwitchNoGUIPlatform::RequestRenderWindowSize(s32 new_window_width, s32 new_window_height)
 {
