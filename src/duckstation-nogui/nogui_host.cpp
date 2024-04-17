@@ -49,12 +49,6 @@
 
 Log_SetChannel(NoGUIHost);
 
-#ifdef _WIN32
-#include "common/windows_headers.h"
-#include <ShlObj.h>
-#include <shellapi.h>
-#endif
-
 static constexpr u32 SETTINGS_VERSION = 3;
 static constexpr auto CPU_THREAD_POLL_INTERVAL =
   std::chrono::milliseconds(8); // how often we'll poll controllers when paused
@@ -204,19 +198,7 @@ void NoGUIHost::SetAppRoot()
 
 void NoGUIHost::SetResourcesDirectory()
 {
-#ifndef __APPLE__NOT_USED // Not using bundles yet.
-
-#if defined(__SWITCH__) && defined(NDEBUG)
   EmuFolders::Resources = "romfs:/resources";
-#else
-  // On Windows/Linux, these are in the binary directory.
-  EmuFolders::Resources = Path::Combine(EmuFolders::AppRoot, "resources");
-#endif
-
-#else
-  // On macOS, this is in the bundle resources directory.
-  EmuFolders::Resources = Path::Canonicalize(Path::Combine(EmuFolders::AppRoot, "../Resources"));
-#endif
 }
 
 void NoGUIHost::SetDataDirectory()
@@ -230,43 +212,6 @@ void NoGUIHost::SetDataDirectory()
     EmuFolders::DataRoot = EmuFolders::AppRoot;
     return;
   }
-
-#if defined(_WIN32)
-  // On Windows, use My Documents\DuckStation.
-  PWSTR documents_directory;
-  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, NULL, &documents_directory)))
-  {
-    if (std::wcslen(documents_directory) > 0)
-      EmuFolders::DataRoot = Path::Combine(StringUtil::WideStringToUTF8String(documents_directory), "DuckStation");
-    CoTaskMemFree(documents_directory);
-  }
-#elif defined(__linux__) || defined(__FreeBSD__)
-  // Use $XDG_CONFIG_HOME/duckstation if it exists.
-  const char* xdg_config_home = getenv("XDG_CONFIG_HOME");
-  if (xdg_config_home && Path::IsAbsolute(xdg_config_home))
-  {
-    EmuFolders::DataRoot = Path::RealPath(Path::Combine(xdg_config_home, "duckstation"));
-  }
-  else
-  {
-    // Use ~/.local/share/duckstation otherwise.
-    const char* home_dir = getenv("HOME");
-    if (home_dir)
-    {
-      // ~/.local/share should exist, but just in case it doesn't and this is a fresh profile..
-      const std::string local_dir(Path::Combine(home_dir, ".local"));
-      const std::string share_dir(Path::Combine(local_dir, "share"));
-      FileSystem::EnsureDirectoryExists(local_dir.c_str(), false);
-      FileSystem::EnsureDirectoryExists(share_dir.c_str(), false);
-      EmuFolders::DataRoot = Path::RealPath(Path::Combine(share_dir, "duckstation"));
-    }
-  }
-#elif defined(__APPLE__)
-  static constexpr char MAC_DATA_DIR[] = "Library/Application Support/DuckStation";
-  const char* home_dir = getenv("HOME");
-  if (home_dir)
-    EmuFolders::DataRoot = Path::RealPath(Path::Combine(home_dir, MAC_DATA_DIR));
-#endif
 
   // make sure it exists
   if (!EmuFolders::DataRoot.empty() && !FileSystem::DirectoryExists(EmuFolders::DataRoot.c_str()))
@@ -438,7 +383,7 @@ std::optional<std::vector<u8>> Host::ReadResourceFile(std::string_view filename,
   const std::string path = NoGUIHost::GetResourcePath(filename, allow_override);
   std::optional<std::vector<u8>> ret(FileSystem::ReadBinaryFile(path.c_str()));
   if (!ret.has_value())
-    Log_ErrorPrintf("Failed to read resource file '%s'", filename);
+    Log_ErrorFmt("Failed to read resource file '{}'", filename);
   return ret;
 }
 
@@ -447,7 +392,7 @@ std::optional<std::string> Host::ReadResourceFileToString(std::string_view filen
   const std::string path = NoGUIHost::GetResourcePath(filename, allow_override);
   std::optional<std::string> ret(FileSystem::ReadFileToString(path.c_str()));
   if (!ret.has_value())
-    Log_ErrorPrintf("Failed to read resource file to string '%s'", filename);
+    Log_ErrorFmt("Failed to read resource file to string '{}'", filename);
   return ret;
 }
 
@@ -457,7 +402,7 @@ std::optional<std::time_t> Host::GetResourceFileTimestamp(std::string_view filen
   FILESYSTEM_STAT_DATA sd;
   if (!FileSystem::StatFile(path.c_str(), &sd))
   {
-    Log_ErrorPrintf("Failed to stat resource file '%s'", filename);
+    Log_ErrorFmt("Failed to stat resource file '{}'", filename);
     return std::nullopt;
   }
 
@@ -651,21 +596,6 @@ void NoGUIHost::StopCPUThread()
   s_cpu_thread.Join();
 }
 
-void NoGUIHost::ProcessCPUThreadPlatformMessages()
-{
-  // This is lame. On Win32, we need to pump messages, even though *we* don't have any windows
-  // on the CPU thread, because SDL creates a hidden window for raw input for some game controllers.
-  // If we don't do this, we don't get any controller events.
-#ifdef _WIN32
-  MSG msg;
-  while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
-  {
-    TranslateMessage(&msg);
-    DispatchMessageW(&msg);
-  }
-#endif
-}
-
 void NoGUIHost::ProcessCPUThreadEvents(bool block)
 {
   std::unique_lock lock(s_cpu_thread_events_mutex);
@@ -680,7 +610,6 @@ void NoGUIHost::ProcessCPUThreadEvents(bool block)
       // we still need to keep polling the controllers when we're paused
       do
       {
-        ProcessCPUThreadPlatformMessages();
         InputManager::PollSources();
       } while (!s_cpu_thread_event_posted.wait_for(lock, CPU_THREAD_POLL_INTERVAL,
                                                    []() { return !s_cpu_thread_events.empty(); }));
@@ -899,35 +828,7 @@ void Host::PumpMessagesOnCPUThread()
 
 std::unique_ptr<NoGUIPlatform> NoGUIHost::CreatePlatform()
 {
-  std::unique_ptr<NoGUIPlatform> ret;
-
-  const char* platform = std::getenv("DUCKSTATION_NOGUI_PLATFORM");
-#ifdef ENABLE_SDL2
-  if (platform && StringUtil::Strcasecmp(platform, "sdl") == 0)
-    ret = NoGUIPlatform::CreateSDLPlatform();
-#endif
-
-#if defined(_WIN32)
-  if (!ret)
-    ret = NoGUIPlatform::CreateWin32Platform();
-#elif defined(__APPLE__)
-  if (!ret)
-    ret = NoGUIPlatform::CreateCocoaPlatform();
-#elif defined(__SWITCH__)
-  ret = NoGUIPlatform::CreateSwitchPlatform();
-#else
-  // linux
-#ifdef NOGUI_PLATFORM_WAYLAND
-  if (!ret && (!platform || StringUtil::Strcasecmp(platform, "wayland") == 0) && std::getenv("WAYLAND_DISPLAY"))
-    ret = NoGUIPlatform::CreateWaylandPlatform();
-#endif
-#ifdef NOGUI_PLATFORM_X11
-  if (!ret && (!platform || StringUtil::Strcasecmp(platform, "x11") == 0) && std::getenv("DISPLAY"))
-    ret = NoGUIPlatform::CreateX11Platform();
-#endif
-#endif
-
-  return ret;
+  return NoGUIPlatform::CreateSwitchPlatform();
 }
 
 std::string NoGUIHost::GetWindowTitle(const std::string& game_title)
@@ -1280,7 +1181,7 @@ bool NoGUIHost::ParseCommandLineParametersAndInitializeConfig(int argc, char* ar
   {
     // NOTE: No point translating this, because no config means the language won't be loaded anyway.
     g_nogui_window->ReportError("Error", "Failed to initialize config.");
-    return EXIT_FAILURE;
+    return false;
   }
 
   // Check the file we're starting actually exists.
@@ -1438,6 +1339,26 @@ void NoGUIHost::AsyncOpProgressCallback::SetCancelled()
     m_cancelled = true;
 }
 
+#ifdef __SWITCH__
+
+static int s_nxlink_stdio_handle;
+
+extern "C" void userAppInit()
+{
+  socketInitializeDefault();
+  s_nxlink_stdio_handle = nxlinkStdio();
+
+  romfsInit();
+}
+
+extern "C" void userAppExit()
+{
+  romfsExit();
+
+  socketExit();
+}
+#endif
+
 int main(int argc, char* argv[])
 {
 #ifdef __SWITCH__
@@ -1461,13 +1382,10 @@ int main(int argc, char* argv[])
 
   switch_program_path = argv[0];
 
-  socketInitializeDefault();
-  int nxlinkStdioHandle = nxlinkStdio();
-
   // slight hack, but passing arguments with a dash does
   // not seem to work via nxlink so we cannot enable
   // early logging via command line
-  if (nxlinkStdioHandle != -1)
+  if (s_nxlink_stdio_handle != -1)
     NoGUIHost::InitializeEarlyConsole();
 #endif
 
@@ -1498,41 +1416,5 @@ int main(int argc, char* argv[])
 
   NoGUIHost::s_base_settings_interface.reset();
   g_nogui_window.reset();
-#ifdef __SWITCH__
-  socketExit();
-#endif
   return EXIT_SUCCESS;
 }
-
-#ifdef _WIN32
-
-int wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nShowCmd)
-{
-  std::vector<std::string> argc_strings;
-  argc_strings.reserve(1);
-
-  // CommandLineToArgvW() only adds the program path if the command line is empty?!
-  argc_strings.push_back(FileSystem::GetProgramPath());
-
-  if (std::wcslen(lpCmdLine) > 0)
-  {
-    int argc;
-    LPWSTR* argv_wide = CommandLineToArgvW(lpCmdLine, &argc);
-    if (argv_wide)
-    {
-      for (int i = 0; i < argc; i++)
-        argc_strings.push_back(StringUtil::WideStringToUTF8String(argv_wide[i]));
-
-      LocalFree(argv_wide);
-    }
-  }
-
-  std::vector<char*> argc_pointers;
-  argc_pointers.reserve(argc_strings.size());
-  for (std::string& arg : argc_strings)
-    argc_pointers.push_back(arg.data());
-
-  return main(static_cast<int>(argc_pointers.size()), argc_pointers.data());
-}
-
-#endif
