@@ -117,7 +117,6 @@ static std::string GetResourcePath(std::string_view name, bool allow_override);
 static void StartCPUThread();
 static void StopCPUThread();
 static void ProcessCPUThreadEvents(bool block);
-static void ProcessCPUThreadPlatformMessages();
 static void CPUThreadEntryPoint();
 static void CPUThreadMainLoop();
 static std::unique_ptr<NoGUIPlatform> CreatePlatform();
@@ -198,7 +197,11 @@ void NoGUIHost::SetAppRoot()
 
 void NoGUIHost::SetResourcesDirectory()
 {
+#ifdef NDEBUG
   EmuFolders::Resources = "romfs:/resources";
+#else
+  EmuFolders::Resources = Path::Combine(EmuFolders::AppRoot, "resources");
+#endif
 }
 
 void NoGUIHost::SetDataDirectory()
@@ -822,7 +825,6 @@ void Host::SetMouseMode(bool relative, bool hide_cursor)
 
 void Host::PumpMessagesOnCPUThread()
 {
-  NoGUIHost::ProcessCPUThreadPlatformMessages();
   NoGUIHost::ProcessCPUThreadEvents(false);
 }
 
