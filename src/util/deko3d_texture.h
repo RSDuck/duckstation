@@ -43,6 +43,7 @@ public:
   ALWAYS_INLINE u32 GetDescriptorIdx() const { return m_descriptor_idx; }
   ALWAYS_INLINE void setDescriptorIdx(u32 idx) { m_descriptor_idx = idx; }
 
+  void MakeReadyForSampling() override;
 private:
   Deko3DTexture(u32 width, u32 height, u32 layers, u32 levels, u32 samples, Type type, Format format,
                 const dk::ImageLayout& layout, const Deko3DMemoryHeap::Allocation& memory);

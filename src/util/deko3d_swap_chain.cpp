@@ -8,7 +8,7 @@
 #include "deko3d_texture.h"
 
 Deko3DSwapChain::Deko3DSwapChain(const WindowInfo& wi, dk::Swapchain swapchain,
-                                std::array<std::unique_ptr<Deko3DTexture>, NUM_SWAPCHAIN_IMAGES>& images)
+                                 std::array<std::unique_ptr<Deko3DTexture>, NUM_SWAPCHAIN_IMAGES>& images)
   : m_swapchain(swapchain), m_window_info(wi), m_images(std::move(images))
 {
 }
@@ -43,7 +43,8 @@ std::unique_ptr<Deko3DSwapChain> Deko3DSwapChain::Create(const WindowInfo& wi)
 
 void Deko3DSwapChain::AcquireNextImage()
 {
-  m_swapchain.acquireImage(m_current_slot, m_acquire_fence);
+  m_current_slot = Deko3DDevice::GetInstance().GetQueue().acquireImage(m_swapchain);
+  // m_swapchain.acquireImage(m_current_slot, m_acquire_fences[m_current_fence++]);
 }
 
 void Deko3DSwapChain::PresentImage()
@@ -53,5 +54,5 @@ void Deko3DSwapChain::PresentImage()
 
 void Deko3DSwapChain::ReleaseImage()
 {
-  //m_current_slot.reset();
+  // m_current_slot.reset();
 }

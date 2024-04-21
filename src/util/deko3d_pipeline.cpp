@@ -25,16 +25,33 @@ Deko3DShader::Deko3DShader(GPUShaderStage stage, dk::Shader shader, Deko3DMemory
 {
 }
 
+// https://github.com/switchbrew/switch-examples/blob/master/graphics/deko3d/deko_examples/source/SampleFramework/CShader.cpp#L7
+struct DkshHeader
+{
+  uint32_t magic;     // DKSH_MAGIC
+  uint32_t header_sz; // sizeof(DkshHeader)
+  uint32_t control_sz;
+  uint32_t code_sz;
+  uint32_t programs_off;
+  uint32_t num_programs;
+};
+
 std::unique_ptr<GPUShader> Deko3DDevice::CreateShaderFromBinary(GPUShaderStage stage, std::span<const u8> data)
 {
   auto& device = Deko3DDevice::GetInstance();
   auto& shaderHeap = device.GetShaderHeap();
 
-  auto memory = shaderHeap.Alloc(data.size_bytes(), DK_SHADER_CODE_ALIGNMENT);
-  std::memcpy(shaderHeap.CPUPointer<void>(memory), data.data(), data.size_bytes());
+  const DkshHeader* header = reinterpret_cast<const DkshHeader*>(data.data());
+  u8* control = new u8[header->control_sz];
+  memcpy(control, &data[0], header->control_sz);
+
+  auto memory = shaderHeap.Alloc(header->code_sz, DK_SHADER_CODE_ALIGNMENT);
+  std::memcpy(shaderHeap.CPUPointer<void>(memory), &data[header->control_sz], data.size_bytes());
 
   dk::Shader shader;
-  dk::ShaderMaker{shaderHeap.GetMemBlock(), memory.offset}.initialize(shader);
+  dk::ShaderMaker{shaderHeap.GetMemBlock(), memory.offset}.setControl(control).setProgramId(0).initialize(shader);
+
+  delete[] control;
 
   return std::unique_ptr<Deko3DShader>(new Deko3DShader(stage, shader, memory));
 }
@@ -186,12 +203,9 @@ void Deko3DDevice::ApplyDepthState(GPUPipeline::DepthState ds)
      DkCompareOp_Gequal, DkCompareOp_Equal}};
 
   dk::DepthStencilState d3d_state;
-  d3d_state.setDepthTestEnable(ds.depth_test != GPUPipeline::DepthFunc::Always || ds.depth_write);
-  if (d3d_state.depthTestEnable)
-  {
-    d3d_state.setDepthCompareOp(map_func[static_cast<u32>(ds.depth_test.GetValue())])
-      .setDepthWriteEnable(ds.depth_write);
-  }
+  d3d_state.setDepthTestEnable(ds.depth_test != GPUPipeline::DepthFunc::Always || ds.depth_write)
+    .setDepthCompareOp(map_func[static_cast<u32>(ds.depth_test.GetValue())])
+    .setDepthWriteEnable(ds.depth_write);
 
   dk::CmdBuf cmdbuf = GetCurrentCommandBuffer();
   cmdbuf.bindDepthStencilState(d3d_state);
@@ -274,6 +288,7 @@ void Deko3DDevice::ApplyBlendState(GPUPipeline::BlendState bs)
 
 void Deko3DDevice::SetPipeline(GPUPipeline* pipeline)
 {
+  // printf("setting pipeline %p\n", pipeline);
   if (pipeline == m_current_pipeline)
     return;
 
@@ -294,11 +309,10 @@ void Deko3DDevice::SetPipeline(GPUPipeline* pipeline)
   cmdbuf.bindVtxBufferState({{P->m_stride, 0}});
 
   if (P->m_geometry_shader)
-    cmdbuf.bindShaders(DkStageFlag_Vertex | DkStageFlag_Geometry | DkStageFlag_Fragment,
+    cmdbuf.bindShaders(DkStageFlag_GraphicsMask,
                        {&P->m_vertex_shader->shader, &P->m_geometry_shader->shader, &P->m_fragment_shader->shader});
   else
-    cmdbuf.bindShaders(DkStageFlag_Vertex | DkStageFlag_Fragment,
-                       {&P->m_vertex_shader->shader, &P->m_fragment_shader->shader});
+    cmdbuf.bindShaders(DkStageFlag_GraphicsMask, {&P->m_vertex_shader->shader, &P->m_fragment_shader->shader});
 
   m_current_pipeline = P;
 }

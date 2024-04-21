@@ -27,8 +27,8 @@ std::unique_ptr<Deko3DTexture> Deko3DTexture::Create(u32 width, u32 height, u32 
 
   Deko3DDevice& dev = Deko3DDevice::GetInstance();
 
-  Log_TracePrintf("Creating texture %ux%u levels=%u levels=%u samples=%u type=%u format=%u flags=%u", width, height,
-                  layers, levels, samples, type, format, flags);
+  Log_TraceFmt("Creating texture {}x{} levels={} levels={} samples={} type={} format={} flags={}", width, height,
+               layers, levels, samples, static_cast<u32>(type), static_cast<u32>(format), flags);
 
   dk::ImageLayout layout;
   dk::ImageLayoutMaker{dev.GetDevice()}
@@ -59,8 +59,27 @@ std::unique_ptr<GPUTexture> Deko3DDevice::CreateTexture(u32 width, u32 height, u
 
   if (tex && data)
     tex->Update(0, 0, width, height, data, data_stride);
+  /*else
+  {
+    // pretty terrible
+    void* data = calloc(width * height * GPUTexture::GetPixelSize(format), 1);
+    tex->Update(0, 0, width, height, data, width * GPUTexture::GetPixelSize(format));
+    free(data);
+  }*/
 
   return tex;
+}
+
+void Deko3DTexture::MakeReadyForSampling()
+{
+  Deko3DDevice& device = Deko3DDevice::GetInstance();
+  if (device.GetCurrentBarrierCounter() == m_barrier_counter)
+  {
+    dk::CmdBuf cmdbuf = device.GetCurrentCommandBuffer();
+    cmdbuf.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image);
+
+    device.IncreaseBarrierCounter();
+  }
 }
 
 Deko3DTexture::Deko3DTexture(u32 width, u32 height, u32 layers, u32 levels, u32 samples, Type type, Format format,
@@ -288,6 +307,35 @@ void Deko3DDevice::CopyTextureRegion(GPUTexture* dst, u32 dst_x, u32 dst_y, u32 
 void Deko3DDevice::ResolveTextureRegion(GPUTexture* dst, u32 dst_x, u32 dst_y, u32 dst_layer, u32 dst_level,
                                         GPUTexture* src, u32 src_x, u32 src_y, u32 width, u32 height)
 {
+  DebugAssert((src_x + width) <= src->GetWidth());
+  DebugAssert((src_y + height) <= src->GetHeight());
+  DebugAssert(src->IsMultisampled());
+  DebugAssert(dst_level < dst->GetLevels() && dst_layer < dst->GetLayers());
+  DebugAssert((dst_x + width) <= dst->GetMipWidth(dst_level));
+  DebugAssert((dst_y + height) <= dst->GetMipHeight(dst_level));
+  DebugAssert(!dst->IsMultisampled() && src->IsMultisampled());
+
+  s_stats.num_copies++;
+
+  Deko3DTexture* D = static_cast<Deko3DTexture*>(dst);
+  Deko3DTexture* S = static_cast<Deko3DTexture*>(src);
+  dk::CmdBuf cmdbuf = GetCurrentCommandBuffer();
+
+  if (S->GetState() == GPUTexture::State::Cleared)
+    CommitClear(cmdbuf, S);
+  if (D->IsRenderTargetOrDepthStencil() && D->GetState() == GPUTexture::State::Cleared)
+  {
+    if (width < dst->GetWidth() || height < dst->GetHeight())
+      CommitClear(cmdbuf, D);
+    else
+      D->SetState(GPUTexture::State::Dirty);
+  }
+
+  dk::ImageView src_view{S->GetImage()};
+  dk::ImageView dst_view{D->GetImage()};
+
+  cmdbuf.blitImage(src_view, {src_x, src_y, 0, width, height, 1}, dst_view, {dst_x, dst_y, dst_layer, width, height, 1},
+                   DkBlitFlag_FilterLinear);
 }
 
 dk::CmdBuf Deko3DTexture::GetCommandBufferForUpdate()
@@ -486,7 +534,7 @@ void Deko3DDevice::CommitClear(dk::CmdBuf command_buffer, Deko3DTexture* tex)
     if (tex->IsDepthStencil())
     {
       const float depth = tex->GetClearDepth();
-      command_buffer.clearDepthStencil(true, depth, 0, 0);
+      command_buffer.clearDepthStencil(true, depth, 0xFF, 0);
     }
     else
     {
@@ -506,6 +554,8 @@ void Deko3DDevice::CommitClear(dk::CmdBuf command_buffer, Deko3DTexture* tex)
   }
   else // tex->GetState() == GPUTexture::State::Invalidated
   {
+    tex->MakeReadyForSampling();
+
     if (tex->IsDepthStencil())
     {
       command_buffer.discardDepthStencil();
@@ -527,6 +577,8 @@ void Deko3DDevice::CommitRTClearInFB(Deko3DTexture* tex, u32 idx)
   {
     case GPUTexture::State::Invalidated:
     {
+      tex->MakeReadyForSampling();
+
       if (tex->IsDepthStencil())
         command_buffer.discardDepthStencil();
       else
@@ -545,7 +597,7 @@ void Deko3DDevice::CommitRTClearInFB(Deko3DTexture* tex, u32 idx)
 
       if (tex->IsDepthStencil())
       {
-        command_buffer.clearDepthStencil(true, tex->GetClearDepth(), 0, 0);
+        command_buffer.clearDepthStencil(true, tex->GetClearDepth(), 0xFF, 0);
       }
       else
       {

@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include <switch.h>
 #include <uam.h>
 
 Log_SetChannel(Deko3D_Device);
@@ -68,7 +69,7 @@ RenderAPI Deko3DDevice::GetRenderAPI() const
 
 bool Deko3DDevice::HasSurface() const
 {
-  return false;
+  return true;
 }
 
 void Deko3DDevice::DestroySurface()
@@ -83,7 +84,7 @@ bool Deko3DDevice::UpdateWindow()
 void Deko3DDevice::ResizeWindow(s32 new_window_width, s32 new_window_height, float new_window_scale)
 {
   // TODO: mich fertig machen
-  /*if (!m_swap_chain)
+  if (!m_swap_chain)
     return;
 
   if (m_swap_chain->GetWidth() == static_cast<u32>(new_window_width) &&
@@ -97,14 +98,13 @@ void Deko3DDevice::ResizeWindow(s32 new_window_width, s32 new_window_height, flo
   // make sure previous frames are presented
   WaitForGPUIdle();
 
-  if (!m_swap_chain->ResizeSwapChain(new_window_width, new_window_height, new_window_scale))
-  {
-    // AcquireNextImage() will fail, and we'll recreate the surface.
-    Log_ErrorPrintf("Failed to resize swap chain. Next present will fail.");
-    return;
-  }
+  m_swap_chain.reset();
 
-  m_window_info = m_swap_chain->GetWindowInfo();*/
+  m_window_info.surface_width = new_window_width;
+  m_window_info.surface_height = new_window_height;
+  m_window_info.surface_scale = new_window_scale;
+
+  m_swap_chain = Deko3DSwapChain::Create(m_window_info);
 }
 
 std::string Deko3DDevice::GetDriverInfo() const
@@ -202,6 +202,7 @@ bool Deko3DDevice::CreateDevice(const std::string_view& adapter, bool threaded_p
 
   m_push_buffer = m_general_heap.Alloc(UNIFORM_PUSH_CONSTANTS_SIZE, DK_UNIFORM_BUF_ALIGNMENT);
   command_buffer.bindUniformBuffer(DkStage_Vertex, 0, m_general_heap.GPUPointer(m_push_buffer), m_push_buffer.size);
+  command_buffer.bindUniformBuffer(DkStage_Geometry, 0, m_general_heap.GPUPointer(m_push_buffer), m_push_buffer.size);
   command_buffer.bindUniformBuffer(DkStage_Fragment, 0, m_general_heap.GPUPointer(m_push_buffer), m_push_buffer.size);
 
   return true;
@@ -212,6 +213,8 @@ void Deko3DDevice::DestroyDevice()
   WaitForGPUIdle();
 
   m_null_texture->Destroy(false);
+
+  m_swap_chain.reset();
 
   m_texture_upload_buffer.reset();
   m_vertex_buffer.reset();
@@ -369,8 +372,11 @@ void Deko3DDevice::SubmitCommandBuffer(Deko3DSwapChain* present_swap_chain)
     are handled together by deko3D this function also does the work of
     DoSubmitCommandBuffer and DoPresent.
   */
-  if (present_swap_chain)
-    m_queue.waitFence(present_swap_chain->GetAcquireFence());
+  // if (present_swap_chain)
+  //   m_queue.waitFence(present_swap_chain->GetAcquireFence());
+
+  // if (resources.init_buffer_used)
+  //   m_queue.submitCommands(resources.command_buffers[COMMAND_BUFFER_INIT].finishList());
 
   if (resources.init_buffer_used)
     m_queue.submitCommands(resources.command_buffers[COMMAND_BUFFER_INIT].finishList());
@@ -493,10 +499,14 @@ void Deko3DDevice::MapVertexBuffer(u32 vertex_size, u32 vertex_count, void** map
   *map_ptr = m_vertex_buffer->GetCurrentHostPointer();
   *map_space = m_vertex_buffer->GetCurrentSpace() / vertex_size;
   *map_base_vertex = m_vertex_buffer->GetCurrentOffset() / vertex_size;
+  // printf("mapping vertex buffer %u %u %p %u %u\n", vertex_size, vertex_count, *map_ptr, *map_space,
+  // *map_base_vertex);
+  Assert((m_vertex_buffer->GetCurrentOffset() % vertex_size) == 0);
 }
 
 void Deko3DDevice::UnmapVertexBuffer(u32 vertex_size, u32 vertex_count)
 {
+  // printf("unmap vertex %u %u\n", vertex_size, vertex_count);
   const u32 size = vertex_size * vertex_count;
   s_stats.buffer_streamed += size;
   m_vertex_buffer->CommitMemory(size);
@@ -515,6 +525,8 @@ void Deko3DDevice::MapIndexBuffer(u32 index_count, DrawIndex** map_ptr, u32* map
   *map_ptr = reinterpret_cast<DrawIndex*>(m_index_buffer->GetCurrentHostPointer());
   *map_space = m_index_buffer->GetCurrentSpace() / sizeof(DrawIndex);
   *map_base_index = m_index_buffer->GetCurrentOffset() / sizeof(DrawIndex);
+
+  // printf("mapping index buffer %u %p %u %u\n", index_count, *map_ptr, *map_space, *map_base_index);
 }
 
 void Deko3DDevice::UnmapIndexBuffer(u32 used_index_count)
@@ -522,6 +534,8 @@ void Deko3DDevice::UnmapIndexBuffer(u32 used_index_count)
   const u32 size = sizeof(DrawIndex) * used_index_count;
   s_stats.buffer_streamed += size;
   m_index_buffer->CommitMemory(size);
+
+  // printf("unmapping index %u\n", used_index_count);
 }
 
 void Deko3DDevice::PushUniformBuffer(const void* data, u32 data_size)
@@ -555,6 +569,10 @@ void Deko3DDevice::UnmapUniformBuffer(u32 size)
 
   dk::CmdBuf cmdbuf = GetCurrentCommandBuffer();
   cmdbuf.bindUniformBuffer(DkStage_Vertex, 1, gpu_addr, size);
+  // hack
+  // currently no geometry shader requires uniforms, so we can
+  // avoid this state change
+  // cmdbuf.bindUniformBuffer(DkStage_Geometry, 1, gpu_addr, size);
   cmdbuf.bindUniformBuffer(DkStage_Fragment, 1, gpu_addr, size);
 }
 
@@ -571,6 +589,7 @@ void Deko3DDevice::SetRenderTargets(GPUTexture* const* rts, u32 num_rts, GPUText
   if (m_current_depth_target)
     m_current_depth_target->SetBarrierCounter(m_barrier_counter);
 
+  // printf("binding render targets (%d) depth %p\n", num_rts, ds);
   for (u32 i = 0; i < num_rts; i++)
   {
     Deko3DTexture* const dt = static_cast<Deko3DTexture*>(rts[i]);
@@ -578,8 +597,10 @@ void Deko3DDevice::SetRenderTargets(GPUTexture* const* rts, u32 num_rts, GPUText
     m_current_render_targets[i] = dt;
     needs_rt_clear |= dt->IsClearedOrInvalidated();
 
+    // printf("%p\n", rts[i]);
     dt->SetBarrierCounter(m_barrier_counter);
   }
+  // printf("changed %d\n", changed);
   for (u32 i = num_rts; i < m_num_current_render_targets; i++)
     m_current_render_targets[i] = nullptr;
   m_num_current_render_targets = num_rts;
@@ -625,6 +646,7 @@ void Deko3DDevice::SetTextureSampler(u32 slot, GPUTexture* texture, GPUSampler* 
 {
   Deko3DTexture* T = texture ? static_cast<Deko3DTexture*>(texture) : m_null_texture.get();
   Deko3DSampler* S = static_cast<Deko3DSampler*>(sampler ? sampler : m_nearest_sampler.get());
+  // printf("set texture sampler %u %p %p\n", slot, texture, sampler);
   if (m_current_textures[slot] != T || m_current_samplers[slot] != S)
   {
     m_current_textures[slot] = T;
@@ -659,6 +681,7 @@ void Deko3DDevice::CreateNullTexture()
 void Deko3DDevice::SetViewport(s32 x, s32 y, s32 width, s32 height)
 {
   const Common::Rectangle<s32> rc = Common::Rectangle<s32>::FromExtents(x, y, width, height);
+  // printf("set viewport %d %d %d %d\n", x, y, width, height);
   if (m_last_viewport == rc)
     return;
 
@@ -670,6 +693,7 @@ void Deko3DDevice::SetViewport(s32 x, s32 y, s32 width, s32 height)
 void Deko3DDevice::SetScissor(s32 x, s32 y, s32 width, s32 height)
 {
   const Common::Rectangle<s32> rc = Common::Rectangle<s32>::FromExtents(x, y, width, height);
+  // printf("set scissor %d %d %d %d\n", x, y, width, height);
   if (m_last_scissor == rc)
     return;
 
@@ -735,7 +759,6 @@ void Deko3DDevice::UnbindTexture(Deko3DTexture* tex)
 
 void Deko3DDevice::PrepareTextures()
 {
-  m_textures_dirty = 0xFF;
   if (m_textures_dirty)
   {
     CommandBuffer& frame_resources = m_frame_resources[m_current_frame];
@@ -772,20 +795,14 @@ void Deko3DDevice::PrepareTextures()
     }
     else
     {
+      Assert(last_dirty < MAX_TEXTURE_SAMPLERS);
+
       for (u32 i = 0; i <= last_dirty; i++)
       {
         Deko3DTexture* texture = m_current_textures[i];
 
         if (!texture)
           continue;
-
-        if (texture->GetBarrierCounter() == m_barrier_counter)
-        {
-          dk::CmdBuf cmdbuf = GetCurrentCommandBuffer();
-          cmdbuf.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image);
-
-          m_barrier_counter++;
-        }
 
         if (texture->GetDescriptorFence() != GetCurrentFenceCounter())
         {
@@ -821,6 +838,7 @@ void Deko3DDevice::PrepareTextures()
 void Deko3DDevice::Draw(u32 vertex_count, u32 base_vertex)
 {
   PrepareTextures();
+  // printf("drawing %u %u %u\n", m_current_pipeline->GetTopology(), base_vertex, vertex_count);
 
   s_stats.num_draws++;
   GetCurrentCommandBuffer().draw(m_current_pipeline->GetTopology(), vertex_count, 1, base_vertex, 0);
@@ -831,6 +849,7 @@ void Deko3DDevice::DrawIndexed(u32 index_count, u32 base_index, u32 base_vertex)
   PrepareTextures();
 
   s_stats.num_draws++;
+  // printf("drawing indexed %u %u %u %u\n", m_current_pipeline->GetTopology(), index_count, base_index, base_vertex);
   GetCurrentCommandBuffer().drawIndexed(m_current_pipeline->GetTopology(), index_count, 1, base_index, base_vertex, 0);
 }
 
@@ -844,11 +863,18 @@ bool Deko3DDevice::BeginPresent(bool skip_present)
   if (skip_present)
     return false;
 
+  // svcSleepThread(1000 * 1000 * 20);
+
   m_swap_chain->AcquireNextImage();
   m_swap_chain->ReleaseImage();
 
-  ClearRenderTarget(m_swap_chain->GetCurrentImage(), 0);
-  SetRenderTarget(m_swap_chain->GetCurrentImage());
+  Deko3DTexture* swapchain_image = m_swap_chain->GetCurrentImage();
+
+  ClearRenderTarget(swapchain_image, 0);
+  SetRenderTarget(swapchain_image);
+
+  SetScissor(0, 0, swapchain_image->GetWidth(), swapchain_image->GetHeight());
+  SetViewport(0, 0, swapchain_image->GetWidth(), swapchain_image->GetHeight());
 
   return true;
 }

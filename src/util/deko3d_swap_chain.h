@@ -26,12 +26,15 @@ public:
   ALWAYS_INLINE const WindowInfo& GetWindowInfo() const { return m_window_info; }
   ALWAYS_INLINE Deko3DTexture* GetCurrentImage() { return m_images[m_current_slot].get(); }
 
+  ALWAYS_INLINE u32 GetWidth() const { return m_window_info.surface_width; }
+  ALWAYS_INLINE u32 GetHeight() const { return m_window_info.surface_height; }
+
   void AcquireNextImage();
   void PresentImage();
 
   void ReleaseImage();
 
-  dk::Fence& GetAcquireFence() { return m_acquire_fence; }
+  //dk::Fence& GetAcquireFence() { return m_acquire_fences[m_current_fence]; }
 
 private:
   Deko3DSwapChain(const WindowInfo& wi, dk::Swapchain swapchain, std::array<std::unique_ptr<Deko3DTexture>, NUM_SWAPCHAIN_IMAGES>& images);
@@ -39,8 +42,6 @@ private:
   dk::Swapchain m_swapchain;
   WindowInfo m_window_info;
   int m_current_slot;
-
-  dk::Fence m_acquire_fence;
 
   std::array<std::unique_ptr<Deko3DTexture>, NUM_SWAPCHAIN_IMAGES> m_images;
 };

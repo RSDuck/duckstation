@@ -229,6 +229,11 @@ bool WindowInfo::QueryRefreshRateForWindow(const WindowInfo& wi, float* refresh_
     return GetRefreshRateFromXRandR(wi, refresh_rate);
 #endif
 
+#ifdef __SWITCH__
+  *refresh_rate = 60.f;
+  return true;
+#endif
+
   return false;
 }
 

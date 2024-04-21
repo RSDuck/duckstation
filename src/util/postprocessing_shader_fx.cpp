@@ -407,6 +407,7 @@ bool PostProcessing::ReShadeFXShader::CreateModule(s32 buffer_width, s32 buffer_
     case RenderAPI::OpenGLES:
     case RenderAPI::Vulkan:
     case RenderAPI::Metal:
+    case RenderAPI::Deko3D:
       pp.add_macro_definition("__RENDERER__", "0x14300");
       break;
 

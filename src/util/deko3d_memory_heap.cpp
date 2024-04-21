@@ -6,6 +6,7 @@
 #include "deko3d_memory_heap.h"
 #include "deko3d_device.h"
 
+#include "common/align.h"
 #include "common/assert.h"
 
 #include <cstdio>
@@ -145,7 +146,9 @@ bool Deko3DMemoryHeap::Create(uint32_t size, uint32_t flags, uint32_t blockPoolS
     sizeLog2++; // round up to the next power of two
   DebugAssert(sizeLog2 >= 5);
 
-  m_memblock = dk::MemBlockMaker{Deko3DDevice::GetInstance().GetDevice(), size}.setFlags(flags).create();
+  m_memblock = dk::MemBlockMaker{Deko3DDevice::GetInstance().GetDevice(), size}
+                 .setFlags(flags)
+                 .create();
 
   if (!m_memblock)
     return false;
@@ -194,7 +197,7 @@ Deko3DMemoryHeap::Allocation Deko3DMemoryHeap::Alloc(uint32_t size, uint32_t ali
   DebugAssertMsg((align & (align - 1)) == 0, "alignment must be a power of two");
   // minimum alignment (and thus size) is 32 bytes
   align = std::max((uint32_t)32, align);
-  size = (size + align - 1) & ~(align - 1);
+  size = Common::AlignUp(size, align);
 
   // printf("allocating %f MB on heap %p (used %f%%)\n", (float)size/(1024.f*1024.f), m_memblock.getCpuAddr(),
   // (float)Used/m_memblock.getSize());

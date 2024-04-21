@@ -77,7 +77,8 @@ public:
   void PushUniformBuffer(const void* data, u32 data_size) override;
   void* MapUniformBuffer(u32 size) override;
   void UnmapUniformBuffer(u32 size) override;
-  void SetRenderTargets(GPUTexture* const* rts, u32 num_rts, GPUTexture* ds, GPUPipeline::RenderPassFlag render_pass_flags = GPUPipeline::NoRenderPassFlags) override;
+  void SetRenderTargets(GPUTexture* const* rts, u32 num_rts, GPUTexture* ds,
+                        GPUPipeline::RenderPassFlag render_pass_flags = GPUPipeline::NoRenderPassFlags) override;
   void SetPipeline(GPUPipeline* pipeline) override;
   void SetTextureSampler(u32 slot, GPUTexture* texture, GPUSampler* sampler) override;
   void SetTextureBuffer(u32 slot, GPUTextureBuffer* buffer) override;
@@ -117,6 +118,9 @@ public:
 
   ALWAYS_INLINE u64 GetCurrentFenceCounter() const { return m_frame_resources[m_current_frame].fence_counter; }
   ALWAYS_INLINE u64 GetCompletedFenceCounter() const { return m_completed_fence_counter; }
+
+  ALWAYS_INLINE u64 GetCurrentBarrierCounter() const { return m_barrier_counter; }
+  ALWAYS_INLINE void IncreaseBarrierCounter() { m_barrier_counter++; }
 
   // Wait for a fence to be completed.
   // Also invokes callbacks for completion.
@@ -237,7 +241,4 @@ private:
   Deko3DTexture* m_current_depth_target = nullptr;
 
   std::unique_ptr<Deko3DTexture> m_null_texture;
-
-  u8* push_data[1024];
-  u32 push_size = 0;
 };
