@@ -106,6 +106,10 @@ void SetSoftwareCursorPosition(u32 index, float pos_x, float pos_y);
 
 /// Adds software cursors to ImGui render list.
 void RenderSoftwareCursors();
+
+// Sets whether to swap the gamepad keys assigned to confirm and cancel
+void SetSwapConfirmCancel(bool enable);
+bool GetSwapConfirmCancel();
 } // namespace ImGuiManager
 
 namespace Host {

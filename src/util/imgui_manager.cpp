@@ -109,6 +109,8 @@ static bool s_show_osd_messages = true;
 static bool s_scale_changed = false;
 
 static std::array<ImGuiManager::SoftwareCursor, InputManager::MAX_SOFTWARE_CURSORS> s_software_cursors = {};
+
+static bool s_swap_confirm_cancel = false;
 } // namespace ImGuiManager
 
 void ImGuiManager::SetFontPathAndRange(std::string path, std::vector<u16> range)
@@ -575,11 +577,12 @@ bool ImGuiManager::AddIconFonts(float size)
     0xf5aa, 0xf5aa, 0xf5e7, 0xf5e7, 0xf65d, 0xf65e, 0xf6a9, 0xf6a9, 0xf6cf, 0xf6cf, 0xf70c, 0xf70c, 0xf794, 0xf794,
     0xf7a0, 0xf7a0, 0xf7c2, 0xf7c2, 0xf807, 0xf807, 0xf815, 0xf815, 0xf818, 0xf818, 0xf84c, 0xf84c, 0xf8cc, 0xf8cc,
     0x0,    0x0};
-  static constexpr ImWchar range_pf[] = {
-    0x2196, 0x2199, 0x219e, 0x21a1, 0x21b0, 0x21b3, 0x21ba, 0x21c3, 0x21c7, 0x21ca, 0x21d0, 0x21d4, 0x21dc, 0x21dd,
-    0x21e0, 0x21e3, 0x21ed, 0x21ee, 0x21f7, 0x21f8, 0x21fa, 0x21fb, 0x227a, 0x227f, 0x2284, 0x2284, 0x235e, 0x235e,
-    0x2360, 0x2361, 0x2364, 0x2366, 0x23b2, 0x23b4, 0x23f4, 0x23f7, 0x2427, 0x243a, 0x243c, 0x243e, 0x2460, 0x246b,
-    0x24f5, 0x24fd, 0x24ff, 0x24ff, 0x278a, 0x278e, 0x27fc, 0x27fc, 0xe001, 0xe001, 0xff21, 0xff3a, 0x0,    0x0};
+  static constexpr ImWchar range_pf[] = {0x2196, 0x2199, 0x219e, 0x21a1, 0x21b0, 0x21b3, 0x21ba, 0x21c3, 0x21c7, 0x21ca,
+                                         0x21d0, 0x21d4, 0x21dc, 0x21dd, 0x21e0, 0x21e3, 0x21ed, 0x21ee, 0x21f7, 0x21f8,
+                                         0x21fa, 0x21fb, 0x21fd, 0x21fe, 0x227a, 0x227f, 0x2284, 0x2284, 0x235e, 0x235e,
+                                         0x2360, 0x2361, 0x2364, 0x2366, 0x23b2, 0x23b4, 0x23f4, 0x23f7, 0x2427, 0x243a,
+                                         0x243c, 0x243e, 0x2460, 0x246b, 0x24f5, 0x24fd, 0x24ff, 0x24ff, 0x278a, 0x278e,
+                                         0x27fc, 0x27fc, 0xe001, 0xe001, 0xff21, 0xff3a, 0x0,    0x0};
 
   {
     ImFontConfig cfg;
@@ -1013,6 +1016,21 @@ bool ImGuiManager::ProcessGenericInputEvent(GenericInputBinding key, float value
   if (static_cast<u32>(key) >= std::size(key_map) || key_map[static_cast<u32>(key)] == ImGuiKey_None)
     return false;
 
+  if (s_swap_confirm_cancel)
+  {
+    switch (key)
+    {
+      case GenericInputBinding::Circle:
+        key = GenericInputBinding::Cross;
+        break;
+      case GenericInputBinding::Cross:
+        key = GenericInputBinding::Circle;
+        break;
+      default:
+        break;
+    }
+  }
+
   ImGui::GetIO().AddKeyAnalogEvent(key_map[static_cast<u32>(key)], (value > 0.0f), value);
   return s_imgui_wants_keyboard.load(std::memory_order_acquire);
 }
@@ -1084,6 +1102,19 @@ void ImGuiManager::RenderSoftwareCursors()
 
   for (u32 i = InputManager::MAX_POINTER_DEVICES; i < InputManager::MAX_SOFTWARE_CURSORS; i++)
     DrawSoftwareCursor(s_software_cursors[i], s_software_cursors[i].pos);
+}
+
+void ImGuiManager::SetSwapConfirmCancel(bool enable)
+{
+  s_swap_confirm_cancel = enable;
+  // Ensure that no key gets stuck.
+  ImGui::GetIO().AddKeyAnalogEvent(ImGuiKey_GamepadFaceRight, false, 0.f);
+  ImGui::GetIO().AddKeyAnalogEvent(ImGuiKey_GamepadFaceDown, false, 0.f);
+}
+
+bool ImGuiManager::GetSwapConfirmCancel()
+{
+  return s_swap_confirm_cancel;
 }
 
 void ImGuiManager::SetSoftwareCursor(u32 index, std::string image_path, float image_scale, u32 multiply_color)
