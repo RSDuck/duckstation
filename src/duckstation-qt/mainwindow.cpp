@@ -1066,15 +1066,13 @@ void MainWindow::onCheatsMenuAboutToShow()
 
 void MainWindow::populateCheatsMenu(QMenu* menu)
 {
-  if (!s_system_valid)
-    return;
-
-  const bool has_cheat_list = System::HasCheatList();
+  const bool has_cheat_list = (s_system_valid && System::HasCheatList());
 
   QMenu* enabled_menu = menu->addMenu(tr("&Enabled Cheats"));
-  enabled_menu->setEnabled(false);
+  enabled_menu->setEnabled(s_system_valid);
   QMenu* apply_menu = menu->addMenu(tr("&Apply Cheats"));
-  apply_menu->setEnabled(false);
+  apply_menu->setEnabled(s_system_valid);
+
   if (has_cheat_list)
   {
     CheatList* cl = System::GetCheatList();
@@ -1773,11 +1771,11 @@ void MainWindow::updateEmulationActions(bool starting, bool running, bool cheevo
   m_ui.actionReset->setDisabled(starting || !running);
   m_ui.actionPause->setDisabled(starting || !running);
   m_ui.actionChangeDisc->setDisabled(starting || !running);
-  m_ui.actionCheats->setDisabled(starting || !running || cheevos_challenge_mode);
-  m_ui.actionCheatsToolbar->setDisabled(starting || !running || cheevos_challenge_mode);
+  m_ui.actionCheats->setDisabled(cheevos_challenge_mode);
+  m_ui.actionCheatsToolbar->setDisabled(cheevos_challenge_mode);
   m_ui.actionScreenshot->setDisabled(starting || !running);
   m_ui.menuChangeDisc->setDisabled(starting || !running);
-  m_ui.menuCheats->setDisabled(starting || !running || cheevos_challenge_mode);
+  m_ui.menuCheats->setDisabled(cheevos_challenge_mode);
   m_ui.actionCPUDebugger->setDisabled(cheevos_challenge_mode);
   m_ui.actionMemoryScanner->setDisabled(cheevos_challenge_mode);
   m_ui.actionDumpRAM->setDisabled(starting || !running || cheevos_challenge_mode);
@@ -2392,6 +2390,39 @@ void MainWindow::setStyleFromSettings()
     darkPalette.setColor(QPalette::Disabled, QPalette::Light, slate.lighter());
 
     qApp->setPalette(darkPalette);
+  }
+  else if (theme == "purplerain")
+  {
+    qApp->setStyle(QStyleFactory::create("Fusion"));
+
+    const QColor darkPurple(73, 41, 121);
+    const QColor darkerPurple(53, 29, 87);
+    const QColor gold(250, 207, 0);
+
+    QPalette darkPalette;
+    darkPalette.setColor(QPalette::Window, darkPurple);
+    darkPalette.setColor(QPalette::WindowText, Qt::white);
+    darkPalette.setColor(QPalette::Base, darkerPurple);
+    darkPalette.setColor(QPalette::AlternateBase, darkPurple);
+    darkPalette.setColor(QPalette::ToolTipBase, darkPurple);
+    darkPalette.setColor(QPalette::ToolTipText, Qt::white);
+    darkPalette.setColor(QPalette::Text, Qt::white);
+    darkPalette.setColor(QPalette::Button, darkerPurple);
+    darkPalette.setColor(QPalette::ButtonText, Qt::white);
+    darkPalette.setColor(QPalette::Link, gold);
+    darkPalette.setColor(QPalette::Highlight, gold);
+    darkPalette.setColor(QPalette::HighlightedText, Qt::black);
+    darkPalette.setColor(QPalette::PlaceholderText, QColor(Qt::white).darker());
+
+    darkPalette.setColor(QPalette::Active, QPalette::Button, darkerPurple);
+    darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText, darkPurple.lighter());
+    darkPalette.setColor(QPalette::Disabled, QPalette::WindowText, darkPurple.lighter());
+    darkPalette.setColor(QPalette::Disabled, QPalette::Text, darkPurple.lighter());
+    darkPalette.setColor(QPalette::Disabled, QPalette::Light, darkPurple);
+
+    qApp->setPalette(darkPalette);
+
+    qApp->setStyleSheet("QToolTip { color: #ffffff; background-color: #505a70; border: 1px solid white; }");
   }
   else
   {

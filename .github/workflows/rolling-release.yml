@@ -238,11 +238,11 @@ jobs:
       uses: actions/cache@v3.3.2
       with:
         path: ~/deps
-        key: deps ${{ hashFiles('scripts/build-dependencies.sh') }}
+        key: deps ${{ hashFiles('scripts/build-dependencies-linux.sh') }}
 
     - name: Build Dependencies
       if: steps.cache-deps.outputs.cache-hit != 'true'
-      run: scripts/build-dependencies.sh "$HOME/deps"
+      run: scripts/build-dependencies-linux.sh "$HOME/deps"
 
     - name: Tag as preview build
       if: github.ref == 'refs/heads/master'
@@ -281,7 +281,7 @@ jobs:
   linux-flatpak-build:
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.6
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.7
       options: --privileged
     timeout-minutes: 120
     steps:
