@@ -178,7 +178,7 @@ if(CPU_ARCH_RISCV64)
   message(STATUS "Building RISC-V 64-bit recompiler.")
 endif()
 
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT NINTENDO_SWITCH)
   target_compile_definitions(core PUBLIC -DENABLE_DISCORD_PRESENCE=1)
   target_link_libraries(core PRIVATE discord-rpc)
 endif()

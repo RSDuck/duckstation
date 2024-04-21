@@ -9,11 +9,17 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-find_package(SDL2 2.30.2 REQUIRED)
+if (NOT NINTENDO_SWITCH)
+  find_package(SDL2 2.30.2 REQUIRED)
+endif()
 find_package(Zstd 1.5.5 REQUIRED)
 find_package(WebP REQUIRED) # v1.3.2, spews an error on Linux because no pkg-config.
 find_package(ZLIB REQUIRED) # 1.3, but Mac currently doesn't use it.
-find_package(PNG 1.6.40 REQUIRED)
+if (NOT NINTENDO_SWITCH)
+  find_package(PNG 1.6.40 REQUIRED)
+else()
+  find_package(PNG 1.6.39 REQUIRED)
+endif()
 find_package(JPEG REQUIRED) # No version because flatpak uses libjpeg-turbo.
 find_package(Freetype 2.13.1 REQUIRED)
 

@@ -172,7 +172,7 @@ if(ENABLE_VULKAN OR APPLE)
   target_link_libraries(util PUBLIC Shaderc::shaderc_shared)
 endif()
 
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT NINTENDO_SWITCH)
   target_sources(util PRIVATE
     cubeb_audio_stream.cpp
     sdl_audio_stream.cpp
