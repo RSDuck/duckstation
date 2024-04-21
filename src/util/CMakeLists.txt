@@ -281,6 +281,8 @@ elseif(NINTENDO_SWITCH)
 
   if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_link_libraries(util PRIVATE deko3dd nxd)
+  else()
+    target_link_libraries(util PRIVATE deko3d nx)
   endif()
 endif()
 

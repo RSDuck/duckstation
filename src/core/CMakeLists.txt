@@ -192,8 +192,8 @@ function(add_resources target path basedir)
 		set_source_files_properties(${path} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/${subdir})
   elseif(NINTENDO_SWITCH)
     add_custom_command(TARGET ${target} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/exefs/resources/${subdir}"
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${path}" "${CMAKE_BINARY_DIR}/exefs/resources/${subdir}")
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/romfs/resources/${subdir}"
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${path}" "${CMAKE_BINARY_DIR}/romfs/resources/${subdir}")
 	else()
 		add_custom_command(TARGET ${target} POST_BUILD
 			COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:${target}>/resources/${subdir}"
