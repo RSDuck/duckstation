@@ -56,7 +56,7 @@ void GPU_HW_ShaderGen::WriteBatchUniformBuffer(std::stringstream& ss)
                        {"uint2 u_texture_window_and", "uint2 u_texture_window_or", "float u_src_alpha_factor",
                         "float u_dst_alpha_factor", "uint u_interlaced_displayed_field",
                         "bool u_set_mask_while_drawing"},
-                       false);
+                       true);
 }
 
 std::string GPU_HW_ShaderGen::GenerateBatchVertexShader(bool textured, bool pgxp_depth)

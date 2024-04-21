@@ -3125,7 +3125,7 @@ void GPU_HW::FlushRender()
 
   if (m_batch_ubo_dirty)
   {
-    g_gpu_device->UploadUniformBuffer(&m_batch_ubo_data, sizeof(m_batch_ubo_data));
+    g_gpu_device->PushUniformBuffer(&m_batch_ubo_data, sizeof(m_batch_ubo_data));
     // m_counters.num_ubo_updates++;
     m_batch_ubo_dirty = false;
   }
