@@ -40,18 +40,18 @@ std::unique_ptr<GPUShader> Deko3DDevice::CreateShaderFromBinary(GPUShaderStage s
 {
   auto& device = Deko3DDevice::GetInstance();
   auto& shaderHeap = device.GetShaderHeap();
-
+/*
   const DkshHeader* header = reinterpret_cast<const DkshHeader*>(data.data());
   u8* control = new u8[header->control_sz];
   memcpy(control, &data[0], header->control_sz);
 
-  auto memory = shaderHeap.Alloc(header->code_sz, DK_SHADER_CODE_ALIGNMENT);
-  std::memcpy(shaderHeap.CPUPointer<void>(memory), &data[header->control_sz], data.size_bytes());
-
+*/
+  auto memory = shaderHeap.Alloc(data.size_bytes(), DK_SHADER_CODE_ALIGNMENT);
+  std::memcpy(shaderHeap.CPUPointer<void>(memory), &data[0], data.size_bytes());
   dk::Shader shader;
-  dk::ShaderMaker{shaderHeap.GetMemBlock(), memory.offset}.setControl(control).setProgramId(0).initialize(shader);
+  dk::ShaderMaker{shaderHeap.GetMemBlock(), memory.offset}/*.setControl(control).setProgramId(0)*/.initialize(shader);
 
-  delete[] control;
+  //delete[] control;
 
   return std::unique_ptr<Deko3DShader>(new Deko3DShader(stage, shader, memory));
 }
@@ -74,16 +74,16 @@ std::unique_ptr<GPUShader> Deko3DDevice::CreateShaderFromSource(GPUShaderStage s
   const uam_pipeline_stage to_uam_stage[] = {uam_pipeline_stage_vertex, uam_pipeline_stage_fragment,
                                              uam_pipeline_stage_geometry, uam_pipeline_stage_compute};
 
-  std::string sourceNullTerminated(source);
+  std::string source_null_terminated(source);
 
   u8* shader_out;
   u32 shader_size;
-  if (!uam_compileDksh(to_uam_stage[static_cast<u32>(stage)], sourceNullTerminated.c_str(), 3, &shader_out,
+  if (!uam_compileDksh(to_uam_stage[static_cast<u32>(stage)], source_null_terminated.c_str(), 3, &shader_out,
                        &shader_size))
   {
     const char* const stageStrings[] = {"vertex", "fragment", "geometry", "compute"};
     Log_ErrorPrintf("Failed to compile %s shader:\n%s", stageStrings[static_cast<u32>(stage)],
-                    sourceNullTerminated.c_str());
+                    source_null_terminated.c_str());
     return {};
   }
 
