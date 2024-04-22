@@ -284,7 +284,7 @@ TinyString SwitchInputSource::ConvertKeyToString(InputBindingKey key)
   {
     if (key.source_subtype == InputSubclass::ControllerAxis && key.data < NUM_AXIS)
     {
-      ret.format("P{}/{}{}", static_cast<u32>(key.source_index), key.invert ? '-' : '+',
+      ret.format("P{}/{}{}", static_cast<u32>(key.source_index), key.modifier == InputModifier::Negate ? '-' : '+',
         s_switch_axis_names[key.data]);
     }
     else if (key.source_subtype == InputSubclass::ControllerButton && key.data < NUM_BUTTONS)
