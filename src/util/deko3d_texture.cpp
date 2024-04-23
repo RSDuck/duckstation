@@ -384,7 +384,7 @@ void Deko3DTexture::UpdateFromBuffer(dk::CmdBuf cmdbuf, u32 x, u32 y, u32 width,
 std::unique_ptr<GPUTextureBuffer> Deko3DDevice::CreateTextureBuffer(GPUTextureBuffer::Format format,
                                                                     u32 size_in_elements)
 {
-  printf("creating texture buffer\n");
+  //printf("creating texture buffer\n");
   Deko3DDevice& dev = Deko3DDevice::GetInstance();
   const u32 buffer_size = GPUTextureBuffer::GetElementSize(format) * size_in_elements;
 
@@ -414,6 +414,7 @@ Deko3DTextureBuffer::Deko3DTextureBuffer(Format format, u32 size_in_elements,
 
 Deko3DTextureBuffer::~Deko3DTextureBuffer()
 {
+  Deko3DDevice::GetInstance().UnbindTextureBuffer(this);
 }
 
 void Deko3DTextureBuffer::SetDebugName(const std::string_view& name)
@@ -482,6 +483,7 @@ Deko3DSampler::Deko3DSampler(const dk::SamplerDescriptor& descriptor) : m_descri
 
 Deko3DSampler::~Deko3DSampler()
 {
+  Deko3DDevice::GetInstance().UnbindTextureSampler(this);
 }
 
 void Deko3DSampler::SetDebugName(const std::string_view& name)

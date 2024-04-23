@@ -135,6 +135,9 @@ public:
   void AddCommandBufferMemory(dk::CmdBuf cmdbuf, size_t min_size);
 
   void UnbindTexture(Deko3DTexture* tex);
+  void UnbindPipeline(Deko3DPipeline* pipeline);
+  void UnbindTextureBuffer(Deko3DTextureBuffer* buffer);
+  void UnbindTextureSampler(Deko3DSampler* sampler);
 
 protected:
   bool CreateDevice(const std::string_view& adapter, bool threaded_presentation,

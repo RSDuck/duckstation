@@ -757,10 +757,55 @@ void Deko3DDevice::UnbindTexture(Deko3DTexture* tex)
   }
 }
 
+void Deko3DDevice::UnbindPipeline(Deko3DPipeline* pipeline)
+{
+  if (m_current_pipeline == pipeline)
+  {
+    m_current_pipeline = nullptr;
+  }
+}
+
+void Deko3DDevice::UnbindTextureBuffer(Deko3DTextureBuffer* buffer)
+{
+  if (m_current_texture_buffer == buffer)
+  {
+    m_current_texture_buffer = nullptr;
+    m_textures_dirty |= 1u;
+  }
+}
+
+void Deko3DDevice::UnbindTextureSampler(Deko3DSampler* sampler)
+{
+  for (u32 slot = 0; slot < MAX_TEXTURE_SAMPLERS; slot++)
+  {
+    if (m_current_samplers[slot] == sampler)
+    {
+      m_current_samplers[slot] = nullptr;
+      m_textures_dirty |= 1u << slot;
+    }
+  }
+}
+
 void Deko3DDevice::PrepareTextures()
 {
   if (m_textures_dirty)
   {
+    u32 textures_dirty = m_textures_dirty;
+
+    if (m_current_pipeline->GetLayout() == GPUPipeline::Layout::MultiTextureAndPushConstants ||
+        m_current_pipeline->GetLayout() == GPUPipeline::Layout::MultiTextureAndUBO)
+    {
+      m_textures_dirty = 0;
+    }
+    else
+    {
+      textures_dirty &= 1;
+      m_textures_dirty &= ~1u;
+
+      if (textures_dirty == 0)
+        return;
+    }
+
     CommandBuffer& frame_resources = m_frame_resources[m_current_frame];
     dk::ImageDescriptor* image_descriptors =
       m_general_heap.CPUPointer<dk::ImageDescriptor>(m_frame_resources[m_current_frame].image_descriptors);
@@ -771,8 +816,8 @@ void Deko3DDevice::PrepareTextures()
 
     std::array<DkResHandle, GPUDevice::MAX_TEXTURE_SAMPLERS> handles;
 
-    u32 first_dirty = CountTrailingZeros(m_textures_dirty);
-    u32 last_dirty = 31 - CountLeadingZeros(m_textures_dirty);
+    u32 first_dirty = CountTrailingZeros(textures_dirty);
+    u32 last_dirty = 31 - CountLeadingZeros(textures_dirty);
 
     if (m_current_pipeline->GetLayout() == GPUPipeline::Layout::SingleTextureBufferAndPushConstants)
     {
@@ -797,7 +842,7 @@ void Deko3DDevice::PrepareTextures()
     {
       Assert(last_dirty < MAX_TEXTURE_SAMPLERS);
 
-      for (u32 i = 0; i <= last_dirty; i++)
+      for (u32 i = first_dirty; i <= last_dirty; i++)
       {
         Deko3DTexture* texture = m_current_textures[i];
 
@@ -814,6 +859,7 @@ void Deko3DDevice::PrepareTextures()
         }
 
         Deko3DSampler* sampler = m_current_samplers[i];
+        DebugAssert(sampler);
         if (sampler->GetDescriptorFence() != GetCurrentFenceCounter())
         {
           u32 descriptor_idx = frame_resources.next_sampler_descriptor++;
@@ -830,8 +876,6 @@ void Deko3DDevice::PrepareTextures()
 
     cmdbuf.bindTextures(DkStage_Fragment, first_dirty,
                         dk::detail::ArrayProxy<const u32>(last_dirty - first_dirty + 1, &handles[first_dirty]));
-
-    m_textures_dirty = 0;
   }
 }
 

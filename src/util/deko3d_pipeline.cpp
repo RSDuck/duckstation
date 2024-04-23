@@ -17,6 +17,7 @@ Deko3DInternalShader::Deko3DInternalShader(const dk::Shader& shader, Deko3DMemor
 
 Deko3DInternalShader::~Deko3DInternalShader()
 {
+  DebugAssert(shader.isValid());
   Deko3DDevice::GetInstance().DeferedFree(Deko3DDevice::GetInstance().GetShaderHeap(), memory);
 }
 
@@ -97,6 +98,7 @@ std::unique_ptr<GPUShader> Deko3DDevice::CreateShaderFromSource(GPUShaderStage s
 
 Deko3DPipeline::~Deko3DPipeline()
 {
+  Deko3DDevice::GetInstance().UnbindPipeline(this);
 }
 
 void Deko3DPipeline::SetDebugName(const std::string_view& name)
