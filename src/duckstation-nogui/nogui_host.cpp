@@ -1344,12 +1344,10 @@ void NoGUIHost::AsyncOpProgressCallback::SetCancelled()
 #ifdef __SWITCH__
 
 static int s_nxlink_stdio_handle;
+static bool s_network_initialized = false;
 
 extern "C" void userAppInit()
 {
-  socketInitializeDefault();
-  s_nxlink_stdio_handle = nxlinkStdio();
-
   romfsInit();
 }
 
@@ -1357,7 +1355,8 @@ extern "C" void userAppExit()
 {
   romfsExit();
 
-  socketExit();
+  if (s_network_initialized)
+    socketExit();
 }
 #endif
 
@@ -1368,19 +1367,44 @@ int main(int argc, char* argv[])
   // things crash and burn due to applet mode
   if (appletGetAppletType() != AppletType_Application)
   {
-    ErrorApplicationConfig errcfg;
-    errorApplicationCreate(
-      &errcfg,
-      "duckstation requires to be run in application mode. It does not work in applet (\"Album\") mode!"
-      "See details for more information.",
-      "The hbmenu needs to be started with title override. By default this is"
-      "accomplished by pressing R while starting any application from the homemenu\n\n"
+    consoleInit(nullptr);
+    printf(
+      CONSOLE_ESC(37;1m)
+      "duckstation requires to be run in application mode.\n\n"
+      CONSOLE_ESC(31;1m)
+      "It does not work in applet (\"Album\") mode!\n"
+      CONSOLE_ESC(0m)
+      "See details for more information.\n\n"
+      "The hbmenu needs to be started with title override.\n"
+      "By default this is accomplished by pressing R while\n"
+      "starting any application from the homemenu\n\n"
 
-      "With Atmosphere's override_config.ini config file this behaviour can be customised.");
-    errorApplicationShow(&errcfg);
+      "With Atmosphere's override_config.ini config file\n"
+      "this behaviour can be customised.\n\n"
+      
+      "Press any key to exit.");
+
+    padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+    PadState pad;
+    padInitializeDefault(&pad);
+    while (appletMainLoop())
+    {
+      padUpdate(&pad);
+
+      if (padGetButtonsDown(&pad))
+        break;
+
+      consoleUpdate(nullptr);
+    }
+
+    consoleExit(nullptr);
 
     return 0;
   }
+
+  socketInitializeDefault();
+  s_network_initialized = true;
+  s_nxlink_stdio_handle = nxlinkStdio();
 
   switch_program_path = argv[0];
 
